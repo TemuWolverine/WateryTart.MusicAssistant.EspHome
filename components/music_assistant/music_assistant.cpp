@@ -136,6 +136,9 @@ void MusicAssistantComponent::send_with_response(
     int read = esp_http_client_read_response(client, buf, sizeof(buf) - 1);
     if (read >= 0) {
       buf[read] = '\0';
+      if (read == static_cast<int>(sizeof(buf) - 1)) {
+        ESP_LOGW(TAG, "Response may have been truncated at %d bytes", read);
+      }
     } else {
       buf[0] = '\0';
     }
@@ -221,6 +224,81 @@ void MusicAssistantComponent::player_seek(const std::string &player_id,
 }
 
 // ---------------------------------------------------------------------------
+// Group volume commands
+// ---------------------------------------------------------------------------
+
+void MusicAssistantComponent::player_group_volume_set(const std::string &player_id,
+                                                       int volume) {
+  char args[128];
+  snprintf(args, sizeof(args), "{\"player_id\":\"%s\",\"volume_level\":%d}",
+           player_id.c_str(), volume);
+  send(make_message_with_args(Commands::PlayerGroupVolume, std::string(args)));
+}
+
+void MusicAssistantComponent::player_group_volume_down(const std::string &player_id) {
+  send(make_message_with_id(Commands::PlayerGroupVolumeDown, player_id));
+}
+
+void MusicAssistantComponent::player_group_volume_up(const std::string &player_id) {
+  send(make_message_with_id(Commands::PlayerGroupVolumeUp, player_id));
+}
+
+// ---------------------------------------------------------------------------
+// Queue management commands
+// ---------------------------------------------------------------------------
+
+void MusicAssistantComponent::queue_clear(const std::string &queue_id) {
+  send(make_message_with_id(Commands::PlayerQueuesClear, queue_id, "queue_id"));
+}
+
+void MusicAssistantComponent::queue_set_shuffle(const std::string &queue_id,
+                                                 bool enabled) {
+  char args[128];
+  snprintf(args, sizeof(args), "{\"queue_id\":\"%s\",\"shuffle_enabled\":%s}",
+           queue_id.c_str(), enabled ? "true" : "false");
+  send(make_message_with_args(Commands::PlayerQueuesShuffle, std::string(args)));
+}
+
+void MusicAssistantComponent::queue_set_repeat(const std::string &queue_id,
+                                                const std::string &mode) {
+  char args[256];
+  snprintf(args, sizeof(args), "{\"queue_id\":\"%s\",\"repeat_mode\":\"%s\"}",
+           queue_id.c_str(), mode.c_str());
+  send(make_message_with_args(Commands::PlayerQueuesRepeat, std::string(args)));
+}
+
+void MusicAssistantComponent::queue_play_media(const std::string &queue_id,
+                                                const std::string &uri,
+                                                const std::string &option) {
+  // media is a JSON array containing the single URI string
+  std::string args = "{\"queue_id\":\"";
+  args += queue_id;
+  args += "\",\"media\":[\"";
+  args += uri;
+  args += "\"],\"option\":\"";
+  args += option;
+  args += "\"}";
+  send(make_message_with_args(Commands::PlayerQueuesPlayMedia, args));
+}
+
+void MusicAssistantComponent::queue_seek(const std::string &queue_id,
+                                          int position) {
+  char args[128];
+  snprintf(args, sizeof(args), "{\"queue_id\":\"%s\",\"position\":%d}",
+           queue_id.c_str(), position);
+  send(make_message_with_args(Commands::PlayerQueuesSeek, std::string(args)));
+}
+
+// ---------------------------------------------------------------------------
+// Favorites
+// ---------------------------------------------------------------------------
+
+void MusicAssistantComponent::add_currently_playing_to_favorites(
+    const std::string &player_id) {
+  send(make_message_with_id(Commands::PlayersAddCurrentlyPlayingToFavorites, player_id));
+}
+
+// ---------------------------------------------------------------------------
 // State fetch methods
 // ---------------------------------------------------------------------------
 
@@ -229,11 +307,38 @@ void MusicAssistantComponent::get_players_all(
   send_with_response(make_message(Commands::PlayersAll), callback);
 }
 
+void MusicAssistantComponent::get_player(
+    const std::string &player_id,
+    std::function<void(const std::string &)> callback) {
+  send_with_response(make_message_with_id(Commands::PlayersGet, player_id), callback);
+}
+
 void MusicAssistantComponent::get_player_active_queue(
     const std::string &player_id,
     std::function<void(const std::string &)> callback) {
   send_with_response(
       make_message_with_id(Commands::PlayerQueuesGetActiveQueue, player_id),
+      callback);
+}
+
+void MusicAssistantComponent::get_player_queues_all(
+    std::function<void(const std::string &)> callback) {
+  send_with_response(make_message(Commands::PlayerQueuesAll), callback);
+}
+
+void MusicAssistantComponent::get_player_queue_items(
+    const std::string &queue_id,
+    std::function<void(const std::string &)> callback) {
+  send_with_response(
+      make_message_with_id(Commands::PlayerQueuesItems, queue_id, "queue_id"),
+      callback);
+}
+
+void MusicAssistantComponent::music_search(
+    const std::string &query,
+    std::function<void(const std::string &)> callback) {
+  send_with_response(
+      make_message_with_id(Commands::MusicSearch, query, "search_query"),
       callback);
 }
 

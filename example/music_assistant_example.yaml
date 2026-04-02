@@ -1,0 +1,65 @@
+substitutions:
+  ma_player_id: "media_player.my_player"
+
+esphome:
+  name: ma-controller
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          id(ma).get_players_all([](const std::string &json) {
+            ESP_LOGI("main", "Players: %s", json.c_str());
+          });
+
+esp32:
+  variant: esp32
+  framework:
+    type: esp-idf
+
+logger:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/TemuWolverine/WateryTart.MusicAssistant.EspHome
+    components: [music_assistant]
+
+music_assistant:
+  id: ma
+  url: "http://192.168.1.x:8095"
+  token: !secret ma_token
+
+globals:
+  - id: current_entity_id
+    type: std::string
+    restore_value: no
+    initial_value: '"${ma_player_id}"'
+
+binary_sensor:
+  - platform: gpio
+    pin: GPIO0
+    name: "Play/Pause"
+    on_press:
+      then:
+        - lambda: |-
+            id(ma).player_play_pause(id(current_entity_id));
+
+  - platform: gpio
+    pin: GPIO1
+    name: "Next Track"
+    on_press:
+      then:
+        - lambda: |-
+            id(ma).player_next(id(current_entity_id));
+
+  - platform: gpio
+    pin: GPIO2
+    name: "Previous Track"
+    on_press:
+      then:
+        - lambda: |-
+            id(ma).player_previous(id(current_entity_id));

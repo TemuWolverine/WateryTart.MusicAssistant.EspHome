@@ -1,0 +1,21 @@
+# Python
+*.pyc
+__pycache__/
+
+# ESPHome
+.esphome/
+secrets.yaml
+
+# PlatformIO
+.pio/
+
+# C++ build artifacts
+*.o
+*.a
+*.so
+
+# Editor
+.vscode/
+
+# macOS
+.DS_Store
